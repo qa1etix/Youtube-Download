@@ -22,7 +22,8 @@ YoutubeDownload/
 ├── main.py           # Основной код скрипта на Python
 ├── requirements.txt  # Зависимости Python
 ├── start.bat         # Запуск из глобальной среды Python
-└── start_venv.bat    # Запуск python из .venv
+├── start_venv.bat    # Запуск python из .venv
+└── install.bat       # Установка зависимостей в глобальную среду python
 ```
 
 ---
