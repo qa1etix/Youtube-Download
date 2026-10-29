@@ -9,7 +9,7 @@ echo 🚀 ЗАПУСК СКРИПТА СКАЧИВАНИЯ И РАЗДЕЛЕНИ
 echo ===================================================
 echo.
 
-".venv\Scripts\python.exe" main.py
+".venv\Scripts\python.exe" main.py --split
 
 echo.
 echo ===================================================

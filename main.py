@@ -48,7 +48,6 @@ def get_video_info_and_formats(url):
             print(f"❌ Критическая ошибка yt-dlp при разборе: {e}")
             return None, None, None
 
-        # Получаем и очищаем оригинальное название видео
         video_title = sanitize_filename(info.get("title", "video"))
 
         formats = info.get("formats", [])
@@ -62,8 +61,8 @@ def get_video_info_and_formats(url):
         return sorted(unique_resolutions.keys(), reverse=True), unique_resolutions, video_title
 
 
-def download_and_split(url):
-    """Скачивает видеопотоки и разделяет их с помощью FFmpeg, используя оригинальное имя."""
+def download_and_split(url, split_media=False):
+    """Скачивает видеопотоки и опционально разделяет их."""
     resolutions, res_dict, video_title = get_video_info_and_formats(url)
     if not resolutions:
         print("❌ Не удалось найти доступные форматы видео.")
@@ -88,13 +87,16 @@ def download_and_split(url):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    # Имя для временного полного файла
-    temp_video_path = os.path.join(output_dir, "temp_full_video.mp4")
+    # Меняем логику: если делим, качаем во временный файл, если нет — сразу в финальный со звуком
+    if split_media:
+        final_video_path = os.path.join(output_dir, "temp_full_video.mp4")
+    else:
+        final_video_path = os.path.join(output_dir, f"{video_title} [{selected_height}p].mp4")
 
     ydl_opts = {
         "format": "bestvideo+bestaudio/best",
         "format_sort": [f"res:{selected_height}", "vcodec:h264", "acodec:aac"],
-        "outtmpl": temp_video_path,
+        "outtmpl": final_video_path,
         "quiet": False,
         "merge_output_format": "mp4",
         "ffmpeg_location": SCRIPT_DIR,
@@ -119,27 +121,38 @@ def download_and_split(url):
         print(f"❌ Ошибка во время скачивания потоков: {e}")
         return
 
-    # Формируем красивые финальные имена по вашей маске
+    # Если разделение не требуется, завершаем работу
+    if not split_media:
+        print(f"✅ Видео со звуком успешно скачано: {final_video_path}")
+        return
+
+    # Логика разделения (отработает, только если split_media == True)
     video_only_path = os.path.join(output_dir, f"{video_title} [{selected_height}p].mp4")
     audio_only_path = os.path.join(output_dir, f"{video_title} [Audio].mp3")
 
     print("\n✂️ Разделение медиафайла на видео и аудиодорожку...")
     try:
-        # Извлекаем видео без звука
-        ffmpeg.input(temp_video_path).output(video_only_path, vcodec="copy", an=None).run(overwrite_output=True, quiet=True)
+        ffmpeg.input(final_video_path).output(video_only_path, vcodec="copy", an=None).run(overwrite_output=True, quiet=True)
         print(f"🎬 Видео без звука успешно сохранено: {video_only_path}")
 
-        # Срезаем аудиодорожку в MP3
-        ffmpeg.input(temp_video_path).output(audio_only_path, acodec="libmp3lame", q=2).run(overwrite_output=True, quiet=True)
+        ffmpeg.input(final_video_path).output(audio_only_path, acodec="libmp3lame", q=2).run(overwrite_output=True, quiet=True)
         print(f"🎵 Итоговая аудиодорожка сохранена: {audio_only_path}")
     except ffmpeg.Error as e:
         print("❌ Ошибка обработки FFmpeg:", e.stderr.decode() if (e.stderr and hasattr(e.stderr, 'decode')) else e)
     finally:
-        if os.path.exists(temp_video_path):
-            os.remove(temp_video_path)
+        if os.path.exists(final_video_path):
+            os.remove(final_video_path)
             print("🧹 Очистка временных файлов завершена.")
 
 
 if __name__ == "__main__":
+    # Проверяем наличие флага разделения в аргументах запуска
+    split_flag = "--split" in sys.argv or "-s" in sys.argv
+    
+    if split_flag:
+        print("⚙️ Режим работы: Скачать и РАЗДЕЛИТЬ на видео и аудио.")
+    else:
+        print("⚙️ Режим работы: Просто СКАЧАТЬ видео со звуком.")
+
     video_url = input("Введите ссылку на видео: ")
-    download_and_split(video_url)
+    download_and_split(video_url, split_media=split_flag)
